@@ -2,6 +2,32 @@
 
 基于 Electron 的 Claude Code 启动器，为不同 API 提供商配置独立的环境变量，支持多 Profile 管理、内置终端与一键启动。
 
+## 界面预览
+
+### 启动页
+
+选择项目目录、切换 Profile 与模型，一键启动 Claude Code。
+
+![启动页](docs/screenshots/home.png)
+
+### 设置页
+
+管理多套 API 配置，支持 Provider 预设、连接测试与模型映射。
+
+![设置页](docs/screenshots/settings.png)
+
+### 内置终端
+
+在应用内直接运行 Claude Code，环境变量仅注入子进程。
+
+![内置终端](docs/screenshots/terminal.png)
+
+### 启动历史
+
+记录每次启动的项目路径、终端模式与模型，支持快速重新启动。
+
+![启动历史](docs/screenshots/history.png)
+
 ## 功能特性
 
 - **多 Provider 支持** — 内置 DeepSeek、LongCat、Anthropic 官方预设，也支持自定义 Base URL
@@ -93,6 +119,10 @@ npm run format
 
 # 验证环境变量构建逻辑
 npm run verify:env
+
+# 重新生成 README 截图（需先 build）
+npm run build
+npx electron scripts/capture-screenshots.cjs
 ```
 
 ## 技术栈
