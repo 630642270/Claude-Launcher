@@ -1,5 +1,9 @@
 appId: com.claude.launcher
 productName: Claude Launcher
+publish:
+  provider: github
+  owner: 630642270
+  repo: Claude-Launcher
 directories:
   buildResources: build
   output: release
@@ -15,9 +19,12 @@ asarUnpack:
   - 'node_modules/node-pty/build/**'
 win:
   executableName: ClaudeLauncher
+  signAndEditExecutable: false
   target:
     - nsis
     - portable
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
 nsis:
   artifactName: ${productName}-${version}-setup.${ext}
   shortcutName: ${productName}

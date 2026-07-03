@@ -4,7 +4,11 @@
   "description": "Electron launcher for Claude Code with isolated DeepSeek environment variables",
   "main": "./out/main/index.js",
   "author": "Claude Launcher",
-  "homepage": "https://github.com/claude-launcher",
+  "homepage": "https://github.com/630642270/Claude-Launcher#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/630642270/Claude-Launcher.git"
+  },
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
@@ -19,6 +23,7 @@
     "rebuild": "electron-rebuild -w node-pty",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
+    "release:win": "npm run build && electron-builder --win --publish always",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux"
   },
