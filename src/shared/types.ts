@@ -73,6 +73,7 @@ export interface AppConfig {
   lastProjectPath: string
   minimizeToTray: boolean
   disableNonessentialTraffic: boolean
+  dangerouslySkipPermissions: boolean
   terminalFontSize: number
   terminalScrollback: number
 }
@@ -86,6 +87,7 @@ export type GlobalSettings = Pick<
   | 'lastProjectPath'
   | 'minimizeToTray'
   | 'disableNonessentialTraffic'
+  | 'dangerouslySkipPermissions'
   | 'terminalFontSize'
   | 'terminalScrollback'
 >
@@ -137,6 +139,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   lastProjectPath: '',
   minimizeToTray: true,
   disableNonessentialTraffic: true,
+  dangerouslySkipPermissions: false,
   terminalFontSize: 14,
   terminalScrollback: 2000
 }

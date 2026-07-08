@@ -176,6 +176,7 @@ export function Settings(): React.JSX.Element {
         claudePath: config.claudePath,
         minimizeToTray: config.minimizeToTray,
         disableNonessentialTraffic: config.disableNonessentialTraffic,
+        dangerouslySkipPermissions: config.dangerouslySkipPermissions,
         terminalFontSize: config.terminalFontSize,
         terminalScrollback: config.terminalScrollback
       }
@@ -496,6 +497,20 @@ export function Settings(): React.JSX.Element {
           />
           禁用非必要网络请求 (CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)
         </label>
+
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={config.dangerouslySkipPermissions}
+            onChange={(e) =>
+              setConfig({ ...config, dangerouslySkipPermissions: e.target.checked })
+            }
+          />
+          跳过权限确认 (--dangerously-skip-permissions)
+        </label>
+        <p className="text-muted" style={{ margin: '-8px 0 0 28px', fontSize: 13 }}>
+          启用后 Claude 将不再询问工具/文件操作权限，请谨慎使用
+        </p>
       </section>
 
       <section className="card">

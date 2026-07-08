@@ -67,6 +67,7 @@ const mockConfig = {
   lastProjectPath: 'C:\\Projects\\my-app',
   minimizeToTray: true,
   disableNonessentialTraffic: true,
+  dangerouslySkipPermissions: false,
   terminalFontSize: 14,
   terminalScrollback: 2000,
   profiles: mockProfiles

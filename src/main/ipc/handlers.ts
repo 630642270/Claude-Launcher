@@ -103,6 +103,9 @@ function pickGlobalSettings(partial: Partial<AppConfig>): Partial<GlobalSettings
   if (partial.disableNonessentialTraffic !== undefined) {
     global.disableNonessentialTraffic = partial.disableNonessentialTraffic
   }
+  if (partial.dangerouslySkipPermissions !== undefined) {
+    global.dangerouslySkipPermissions = partial.dangerouslySkipPermissions
+  }
   if (partial.terminalFontSize !== undefined) global.terminalFontSize = partial.terminalFontSize
   if (partial.terminalScrollback !== undefined) global.terminalScrollback = partial.terminalScrollback
 

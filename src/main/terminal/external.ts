@@ -3,6 +3,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import type { AppConfig } from '../../shared/types'
 import { buildClaudeEnv } from '../envBuilder'
+import { appendCliArgsToCommand, buildClaudeCliArgs } from './claudeCliArgs'
 
 function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   const clean: Record<string, string> = {}
@@ -16,16 +17,16 @@ function escapePowerShellSingleQuoted(value: string): string {
   return value.replace(/'/g, "''")
 }
 
-function buildPowerShellClaudeCommand(claudePath: string): string {
+function buildPowerShellClaudeCommand(claudePath: string, cliArgs: string[]): string {
   if (/^[a-zA-Z]:\\/.test(claudePath) || claudePath.includes('\\') || claudePath.includes('/')) {
-    return `& '${escapePowerShellSingleQuoted(claudePath)}'`
+    return appendCliArgsToCommand(`& '${escapePowerShellSingleQuoted(claudePath)}'`, cliArgs)
   }
-  return claudePath
+  return appendCliArgsToCommand(claudePath, cliArgs)
 }
 
-function buildCmdClaudeArg(claudePath: string): string {
-  if (claudePath.includes(' ')) return `"${claudePath}"`
-  return claudePath
+function buildCmdClaudeArg(claudePath: string, cliArgs: string[]): string {
+  const quoted = claudePath.includes(' ') ? `"${claudePath}"` : claudePath
+  return appendCliArgsToCommand(quoted, cliArgs)
 }
 
 function resolveWindowsTerminal(): string {
@@ -63,11 +64,12 @@ function spawnWindowsConsole(
 function launchUnixExternal(
   env: NodeJS.ProcessEnv,
   projectPath: string,
-  claudePath: string
+  claudePath: string,
+  cliArgs: string[]
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const shell = process.env.SHELL ?? '/bin/bash'
-    const child = spawn(shell, ['-lc', claudePath], {
+    const child = spawn(shell, ['-lc', appendCliArgsToCommand(claudePath, cliArgs)], {
       env: sanitizeEnv(env),
       detached: true,
       stdio: 'ignore',
@@ -89,13 +91,14 @@ export function launchExternalTerminal(
 ): Promise<void> {
   const env = buildClaudeEnv(config)
   const preference = config.externalTerminal
+  const cliArgs = buildClaudeCliArgs(config)
 
   if (process.platform !== 'win32') {
-    return launchUnixExternal(env, projectPath, claudePath)
+    return launchUnixExternal(env, projectPath, claudePath, cliArgs)
   }
 
-  const psCommand = buildPowerShellClaudeCommand(claudePath)
-  const cmdArg = buildCmdClaudeArg(claudePath)
+  const psCommand = buildPowerShellClaudeCommand(claudePath, cliArgs)
+  const cmdArg = buildCmdClaudeArg(claudePath, cliArgs)
 
   if (preference === 'wt') {
     const wt = resolveWindowsTerminal()

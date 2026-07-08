@@ -43,6 +43,7 @@ interface PersistedConfig {
   lastProjectPath: string
   minimizeToTray: boolean
   disableNonessentialTraffic: boolean
+  dangerouslySkipPermissions: boolean
   terminalFontSize: number
   terminalScrollback: number
   history: LaunchRecord[]
@@ -58,6 +59,7 @@ const store = new Store<PersistedConfig>({
     lastProjectPath: DEFAULT_CONFIG.lastProjectPath,
     minimizeToTray: DEFAULT_CONFIG.minimizeToTray,
     disableNonessentialTraffic: DEFAULT_CONFIG.disableNonessentialTraffic,
+    dangerouslySkipPermissions: DEFAULT_CONFIG.dangerouslySkipPermissions,
     terminalFontSize: DEFAULT_CONFIG.terminalFontSize,
     terminalScrollback: DEFAULT_CONFIG.terminalScrollback,
     history: []
@@ -170,6 +172,8 @@ function persistProfilesState(
     lastProjectPath: data.lastProjectPath,
     minimizeToTray: data.minimizeToTray,
     disableNonessentialTraffic: data.disableNonessentialTraffic,
+    dangerouslySkipPermissions:
+      data.dangerouslySkipPermissions ?? DEFAULT_CONFIG.dangerouslySkipPermissions,
     terminalFontSize: data.terminalFontSize ?? DEFAULT_CONFIG.terminalFontSize,
     terminalScrollback: data.terminalScrollback ?? DEFAULT_CONFIG.terminalScrollback,
     history: data.history ?? []
@@ -240,6 +244,8 @@ function buildAppConfig(
     lastProjectPath: data.lastProjectPath,
     minimizeToTray: data.minimizeToTray,
     disableNonessentialTraffic: data.disableNonessentialTraffic,
+    dangerouslySkipPermissions:
+      data.dangerouslySkipPermissions ?? DEFAULT_CONFIG.dangerouslySkipPermissions,
     terminalFontSize: data.terminalFontSize ?? DEFAULT_CONFIG.terminalFontSize,
     terminalScrollback: data.terminalScrollback ?? DEFAULT_CONFIG.terminalScrollback
   }
@@ -267,6 +273,8 @@ export function saveGlobalSettings(partial: Partial<GlobalSettings>): AppConfig 
     minimizeToTray: partial.minimizeToTray ?? data.minimizeToTray,
     disableNonessentialTraffic:
       partial.disableNonessentialTraffic ?? data.disableNonessentialTraffic,
+    dangerouslySkipPermissions:
+      partial.dangerouslySkipPermissions ?? data.dangerouslySkipPermissions ?? DEFAULT_CONFIG.dangerouslySkipPermissions,
     terminalFontSize: partial.terminalFontSize ?? data.terminalFontSize ?? DEFAULT_CONFIG.terminalFontSize,
     terminalScrollback:
       partial.terminalScrollback ?? data.terminalScrollback ?? DEFAULT_CONFIG.terminalScrollback,
@@ -290,6 +298,9 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.minimizeToTray !== undefined) global.minimizeToTray = partial.minimizeToTray
   if (partial.disableNonessentialTraffic !== undefined) {
     global.disableNonessentialTraffic = partial.disableNonessentialTraffic
+  }
+  if (partial.dangerouslySkipPermissions !== undefined) {
+    global.dangerouslySkipPermissions = partial.dangerouslySkipPermissions
   }
   if (partial.terminalFontSize !== undefined) global.terminalFontSize = partial.terminalFontSize
   if (partial.terminalScrollback !== undefined) global.terminalScrollback = partial.terminalScrollback
@@ -394,6 +405,10 @@ export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings
       minimizeToTray: global.minimizeToTray ?? data.minimizeToTray,
       disableNonessentialTraffic:
         global.disableNonessentialTraffic ?? data.disableNonessentialTraffic,
+      dangerouslySkipPermissions:
+        global.dangerouslySkipPermissions ??
+        data.dangerouslySkipPermissions ??
+        DEFAULT_CONFIG.dangerouslySkipPermissions,
       terminalFontSize: global.terminalFontSize ?? data.terminalFontSize ?? DEFAULT_CONFIG.terminalFontSize,
       terminalScrollback:
         global.terminalScrollback ?? data.terminalScrollback ?? DEFAULT_CONFIG.terminalScrollback,

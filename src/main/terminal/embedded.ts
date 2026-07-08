@@ -73,7 +73,7 @@ export async function launchEmbeddedTerminal(
   killEmbeddedTerminal()
 
   const env = buildEmbeddedEnv(config)
-  const { file, args } = buildEmbeddedSpawn(claudePath, projectPath)
+  const { file, args } = buildEmbeddedSpawn(config, claudePath, projectPath)
   const cols = size?.cols ?? 100
   const rows = size?.rows ?? 28
   const sessionId = currentSessionId

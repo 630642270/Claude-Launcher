@@ -1,6 +1,7 @@
 import { existsSync } from 'fs'
 import type { AppConfig } from '../../shared/types'
 import { buildClaudeEnv } from '../envBuilder'
+import { appendCliArgsToCommand, buildClaudeCliArgs } from './claudeCliArgs'
 
 export function buildEmbeddedEnv(config: AppConfig): Record<string, string> {
   const env = buildClaudeEnv(config) as Record<string, string>
@@ -18,23 +19,26 @@ export function buildEmbeddedEnv(config: AppConfig): Record<string, string> {
 }
 
 export function buildEmbeddedSpawn(
+  config: AppConfig,
   claudePath: string,
   _projectPath: string
 ): { file: string; args: string[] } {
+  const cliArgs = buildClaudeCliArgs(config)
+
   if (process.platform === 'win32') {
     if (existsSync(claudePath)) {
-      return { file: claudePath, args: [] }
+      return { file: claudePath, args: cliArgs }
     }
 
     const command = claudePath.includes(' ') ? `"${claudePath}"` : claudePath
     return {
       file: process.env.ComSpec ?? 'cmd.exe',
-      args: ['/d', '/s', '/c', `chcp 65001>nul && ${command}`]
+      args: ['/d', '/s', '/c', `chcp 65001>nul && ${appendCliArgsToCommand(command, cliArgs)}`]
     }
   }
 
   return {
     file: process.env.SHELL ?? '/bin/bash',
-    args: ['-lc', claudePath]
+    args: ['-lc', appendCliArgsToCommand(claudePath, cliArgs)]
   }
 }
