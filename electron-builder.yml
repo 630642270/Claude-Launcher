@@ -17,6 +17,11 @@ files:
 asarUnpack:
   - 'node_modules/node-pty/prebuilds/**'
   - 'node_modules/node-pty/build/**'
+extraResources:
+  - from: build/icon.ico
+    to: icons/icon.ico
+  - from: build/icon.png
+    to: icons/icon.png
 win:
   executableName: ClaudeLauncher
   signAndEditExecutable: false

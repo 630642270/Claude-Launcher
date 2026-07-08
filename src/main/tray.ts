@@ -12,8 +12,16 @@ export function setTrayQuitting(_value: boolean): void {
   // kept for lifecycle hook symmetry
 }
 
+function getAppIconPath(): string {
+  const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'icons', iconName)
+  }
+  return join(__dirname, '../../build', iconName)
+}
+
 function buildTrayIcon(): Electron.NativeImage {
-  return nativeImage.createFromPath(join(__dirname, '../../build/icon.png'))
+  return nativeImage.createFromPath(getAppIconPath())
 }
 
 function buildTrayMenu(): Menu {

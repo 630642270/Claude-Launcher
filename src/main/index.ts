@@ -13,6 +13,14 @@ function getMainWindow(): BrowserWindow | null {
   return mainWindow
 }
 
+function getAppIconPath(): string {
+  const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'icons', iconName)
+  }
+  return join(__dirname, '../../build', iconName)
+}
+
 function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1100,
@@ -22,7 +30,7 @@ function createWindow(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     title: 'Claude Launcher',
-    icon: join(__dirname, '../../build/icon.png'),
+    icon: getAppIconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
