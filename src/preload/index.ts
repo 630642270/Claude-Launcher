@@ -23,6 +23,7 @@ export interface TerminalSessionState {
 export interface LauncherAPI {
   getConfig(): Promise<ConfigView>
   saveConfig(config: Partial<AppConfig>): Promise<ConfigView>
+  revealApiKey(profileId: string): Promise<string>
   switchProfile(profileId: string): Promise<ConfigView>
   saveProfile(request: ProfileSaveRequest): Promise<ConfigView & { fetchError?: string }>
   createProfile(name?: string): Promise<ConfigView>
@@ -58,6 +59,7 @@ declare global {
 const launcher: LauncherAPI = {
   getConfig: () => ipcRenderer.invoke('config:get'),
   saveConfig: (config) => ipcRenderer.invoke('config:save', config),
+  revealApiKey: (profileId) => ipcRenderer.invoke('profile:revealApiKey', profileId),
   switchProfile: (profileId) => ipcRenderer.invoke('profile:switch', profileId),
   saveProfile: (request) => ipcRenderer.invoke('profile:save', request),
   createProfile: (name) => ipcRenderer.invoke('profile:create', name),

@@ -13,6 +13,19 @@ export function normalizeBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, '')
 }
 
+/** Build the models list URL from optional modelsUrl or default baseUrl/v1/models. */
+export function resolveModelsListUrl(baseUrl: string, modelsUrl?: string): string {
+  const custom = modelsUrl?.trim()
+  if (custom) {
+    const normalized = normalizeBaseUrl(custom)
+    const withModels = /\/models$/i.test(normalized) ? normalized : `${normalized}/models`
+    return withModels.includes('?') ? `${withModels}&limit=1000` : `${withModels}?limit=1000`
+  }
+
+  const normalized = normalizeBaseUrl(baseUrl)
+  return `${normalized}/v1/models?limit=1000`
+}
+
 function buildAuthHeaders(apiKey: string): Record<string, string> {
   return {
     'anthropic-version': '2023-06-01',
@@ -26,7 +39,7 @@ function mapError(status: number, body: string): string {
     return 'API Key 无效或无权访问'
   }
   if (status === 404) {
-    return '该 Base URL 不支持 /v1/models 端点，可手动填写模型 ID'
+    return '该地址不支持模型列表端点，可填写「模型列表地址」或手动填写模型 ID'
   }
   if (status >= 500) {
     return `服务端错误 (${status})`
@@ -37,16 +50,19 @@ function mapError(status: number, body: string): string {
   return `请求失败 (${status})`
 }
 
-export async function fetchModels(baseUrl: string, apiKey: string): Promise<AvailableModel[]> {
-  if (!baseUrl.trim()) {
-    throw new Error('请先填写 API Base URL')
+export async function fetchModels(
+  baseUrl: string,
+  apiKey: string,
+  modelsUrl?: string
+): Promise<AvailableModel[]> {
+  if (!baseUrl.trim() && !modelsUrl?.trim()) {
+    throw new Error('请先填写 API Base URL 或模型列表地址')
   }
   if (!apiKey.trim()) {
     throw new Error('请先填写 API Key')
   }
 
-  const normalized = normalizeBaseUrl(baseUrl)
-  const url = `${normalized}/v1/models?limit=1000`
+  const url = resolveModelsListUrl(baseUrl, modelsUrl)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
@@ -95,10 +111,11 @@ export async function fetchModels(baseUrl: string, apiKey: string): Promise<Avai
 
 export async function testConnection(
   baseUrl: string,
-  apiKey: string
+  apiKey: string,
+  modelsUrl?: string
 ): Promise<ConnectionTestResult> {
   try {
-    const models = await fetchModels(baseUrl, apiKey)
+    const models = await fetchModels(baseUrl, apiKey, modelsUrl)
     return {
       ok: true,
       message: `连接成功，发现 ${models.length} 个模型`,

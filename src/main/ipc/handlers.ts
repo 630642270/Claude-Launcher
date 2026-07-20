@@ -6,6 +6,7 @@ import {
   getActiveProfileLaunchModel,
   getConfig,
   getConfigForRenderer,
+  getProfileApiKey,
   saveGlobalSettings,
   saveProfile,
   switchProfile,
@@ -42,9 +43,15 @@ function notifyTerminalLaunched(
   return result
 }
 
-function resolveCredentials(request?: ProviderRequest): { baseUrl: string; apiKey: string } {
+function resolveCredentials(request?: ProviderRequest): {
+  baseUrl: string
+  apiKey: string
+  modelsUrl: string
+} {
   const config = getConfig()
   const baseUrl = request?.baseUrl?.trim() || config.baseUrl
+  const modelsUrl =
+    request?.modelsUrl !== undefined ? request.modelsUrl.trim() : config.modelsUrl
   let apiKey = request?.apiKey?.trim() || config.apiKey
 
   if (request?.profileId && !request.apiKey?.trim()) {
@@ -62,15 +69,16 @@ function resolveCredentials(request?: ProviderRequest): { baseUrl: string; apiKe
     throw new Error('请先填写 API Key')
   }
 
-  return { baseUrl, apiKey }
+  return { baseUrl, apiKey, modelsUrl }
 }
 
 async function refreshModelsAndSave(
   baseUrl: string,
   apiKey: string,
+  modelsUrl?: string,
   applySuggestions = true
 ): Promise<ReturnType<typeof toConfigView>> {
-  const models = await fetchModels(baseUrl, apiKey)
+  const models = await fetchModels(baseUrl, apiKey, modelsUrl)
   const current = getConfig()
   const suggested = applySuggestions ? suggestModelMapping(models) : {}
 
@@ -85,7 +93,8 @@ async function refreshModelsAndSave(
           effortLevel: current.models.effortLevel
         }
       : current.models,
-    Date.now()
+    Date.now(),
+    modelsUrl ?? current.modelsUrl
   )
 
   return toConfigView(saved)
@@ -186,6 +195,10 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   ipcMain.handle('config:get', () => getConfigForRenderer())
 
+  ipcMain.handle('profile:revealApiKey', (_event, profileId: string) => {
+    return getProfileApiKey(profileId)
+  })
+
   ipcMain.handle('config:save', async (_event, partial: Partial<AppConfig>) => {
     const global = pickGlobalSettings(partial)
     const saved = Object.keys(global).length > 0 ? saveGlobalSettings(global) : getConfig()
@@ -203,7 +216,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
     if (hadNewApiKey && saved.apiKey && saved.baseUrl) {
       try {
-        return await refreshModelsAndSave(saved.baseUrl, saved.apiKey)
+        return await refreshModelsAndSave(saved.baseUrl, saved.apiKey, saved.modelsUrl)
       } catch (error) {
         return {
           ...toConfigView(saved),
@@ -226,13 +239,13 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   })
 
   ipcMain.handle('provider:testConnection', async (_event, request?: ProviderRequest) => {
-    const { baseUrl, apiKey } = resolveCredentials(request)
-    return testConnection(baseUrl, apiKey)
+    const { baseUrl, apiKey, modelsUrl } = resolveCredentials(request)
+    return testConnection(baseUrl, apiKey, modelsUrl)
   })
 
   ipcMain.handle('provider:fetchModels', async (_event, request?: ProviderRequest) => {
-    const { baseUrl, apiKey } = resolveCredentials(request)
-    return refreshModelsAndSave(baseUrl, apiKey)
+    const { baseUrl, apiKey, modelsUrl } = resolveCredentials(request)
+    return refreshModelsAndSave(baseUrl, apiKey, modelsUrl)
   })
 
   ipcMain.handle('dialog:pickDirectory', async () => {

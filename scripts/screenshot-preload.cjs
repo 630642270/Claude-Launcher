@@ -14,6 +14,7 @@ const mockProfiles = [
     name: 'DeepSeek 主力',
     providerId: 'deepseek',
     baseUrl: 'https://api.deepseek.com/anthropic',
+    modelsUrl: '',
     models: {
       main: 'deepseek-v4-pro[1m]',
       opus: 'deepseek-v4-pro[1m]',
@@ -36,6 +37,7 @@ const mockProfiles = [
     name: 'LongCat 备用',
     providerId: 'longcat',
     baseUrl: 'https://api.longcat.chat/anthropic',
+    modelsUrl: '',
     models: {
       main: 'LongCat-2.0',
       opus: 'LongCat-2.0',
@@ -58,6 +60,7 @@ const mockConfig = {
   providerId: activeProfile.providerId,
   apiKeyMasked: activeProfile.apiKeyMasked,
   baseUrl: activeProfile.baseUrl,
+  modelsUrl: activeProfile.modelsUrl,
   models: activeProfile.models,
   availableModels: activeProfile.availableModels,
   customEnv: [],
@@ -111,6 +114,8 @@ const launcher = {
     Object.assign(mockConfig, partial)
     return Promise.resolve(structuredClone(mockConfig))
   },
+  revealApiKey: (profileId) =>
+    Promise.resolve(profileId === 'profile-longcat' ? 'lc-demo-key-9f3a' : 'sk-demo-key-b12c'),
   switchProfile: (profileId) => {
     const profile = mockProfiles.find((item) => item.id === profileId)
     if (profile) {

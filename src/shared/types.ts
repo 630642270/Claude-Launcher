@@ -27,6 +27,7 @@ export interface ConnectionTestResult {
 export interface ProviderRequest {
   baseUrl?: string
   apiKey?: string
+  modelsUrl?: string
   profileId?: string
 }
 
@@ -35,6 +36,8 @@ export interface ApiProfile {
   name: string
   providerId: ProviderId
   baseUrl: string
+  /** Optional models list endpoint; empty = {baseUrl}/v1/models */
+  modelsUrl: string
   models: ModelConfig
   availableModels: AvailableModel[]
   modelsFetchedAt?: number
@@ -52,6 +55,7 @@ export interface ProfileInput {
   name: string
   providerId: ProviderId
   baseUrl: string
+  modelsUrl?: string
   apiKey?: string
   models: ModelConfig
   availableModels?: AvailableModel[]
@@ -63,6 +67,7 @@ export interface AppConfig {
   providerId: ProviderId
   apiKey: string
   baseUrl: string
+  modelsUrl: string
   models: ModelConfig
   availableModels: AvailableModel[]
   modelsFetchedAt?: number
@@ -130,6 +135,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   providerId: 'deepseek',
   apiKey: '',
   baseUrl: deepseekPreset.baseUrl,
+  modelsUrl: '',
   models: { ...EMPTY_MODELS, ...deepseekPreset.defaultModels, effortLevel: 'max' },
   availableModels: [],
   customEnv: [],

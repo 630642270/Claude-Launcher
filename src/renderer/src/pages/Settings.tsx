@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AppConfig, ConfigView, ProviderId } from '@shared/types'
 import { DEFAULT_CONFIG, EFFORT_OPTIONS } from '@shared/types'
 import { PROVIDER_PRESETS, getProviderPreset } from '@shared/providers'
@@ -12,6 +12,7 @@ type SettingsState = Omit<AppConfig, 'apiKey'> & {
 }
 
 export function Settings(): React.JSX.Element {
+  const revealRequestIdRef = useRef(0)
   const [config, setConfig] = useState<SettingsState>({
     ...DEFAULT_CONFIG,
     apiKeyMasked: '',
@@ -20,6 +21,9 @@ export function Settings(): React.JSX.Element {
   const [profileName, setProfileName] = useState('')
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
+  const [apiKeyDirty, setApiKeyDirty] = useState(false)
+  const [revealingApiKey, setRevealingApiKey] = useState(false)
+  const [apiKeyError, setApiKeyError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -30,6 +34,7 @@ export function Settings(): React.JSX.Element {
 
   const applyConfigView = (data: ConfigView): void => {
     const active = data.profiles.find((profile) => profile.id === data.activeProfileId)
+    revealRequestIdRef.current += 1
 
     setConfig({
       ...DEFAULT_CONFIG,
@@ -39,6 +44,10 @@ export function Settings(): React.JSX.Element {
     setProfileName(active?.name ?? '')
     setHasSavedApiKey(Boolean(data.apiKeyMasked))
     setApiKeyInput('')
+    setApiKeyDirty(false)
+    setShowApiKey(false)
+    setRevealingApiKey(false)
+    setApiKeyError('')
   }
 
   useEffect(() => {
@@ -66,8 +75,50 @@ export function Settings(): React.JSX.Element {
   }
 
   const resolveApiKey = (): string | undefined => {
+    if (!apiKeyDirty) return undefined
     const trimmed = apiKeyInput.trim()
     return trimmed || undefined
+  }
+
+  const toggleApiKeyVisibility = async (): Promise<void> => {
+    if (showApiKey) {
+      setShowApiKey(false)
+      if (hasSavedApiKey && !apiKeyDirty) {
+        setApiKeyInput('')
+      }
+      return
+    }
+
+    if (apiKeyInput || !hasSavedApiKey) {
+      setShowApiKey(true)
+      return
+    }
+
+    setRevealingApiKey(true)
+    setApiKeyError('')
+    const profileId = config.activeProfileId
+    const requestId = ++revealRequestIdRef.current
+
+    try {
+      const apiKey = await window.launcher.revealApiKey(profileId)
+      if (revealRequestIdRef.current !== requestId) return
+      if (!apiKey) {
+        setApiKeyError('当前配置没有可显示的 API Key')
+        return
+      }
+
+      setApiKeyInput(apiKey)
+      setApiKeyDirty(false)
+      setShowApiKey(true)
+    } catch (error) {
+      if (revealRequestIdRef.current === requestId) {
+        setApiKeyError(String(error).replace('Error: ', ''))
+      }
+    } finally {
+      if (revealRequestIdRef.current === requestId) {
+        setRevealingApiKey(false)
+      }
+    }
   }
 
   const switchProfile = async (profileId: string): Promise<void> => {
@@ -112,6 +163,7 @@ export function Settings(): React.JSX.Element {
     try {
       const result = await window.launcher.testConnection({
         baseUrl: config.baseUrl,
+        modelsUrl: config.modelsUrl,
         apiKey: resolveApiKey(),
         profileId: config.activeProfileId
       })
@@ -141,6 +193,7 @@ export function Settings(): React.JSX.Element {
     try {
       const updated = await window.launcher.fetchModels({
         baseUrl: config.baseUrl,
+        modelsUrl: config.modelsUrl,
         apiKey: resolveApiKey(),
         profileId: config.activeProfileId
       })
@@ -164,6 +217,7 @@ export function Settings(): React.JSX.Element {
         name: profileName.trim() || '未命名',
         providerId: config.providerId,
         baseUrl: config.baseUrl,
+        modelsUrl: config.modelsUrl,
         apiKey: newKey,
         models: config.models,
         availableModels: config.availableModels,
@@ -250,15 +304,20 @@ export function Settings(): React.JSX.Element {
               className="field-input"
               type={showApiKey ? 'text' : 'password'}
               value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
+              onChange={(e) => {
+                setApiKeyInput(e.target.value)
+                setApiKeyDirty(true)
+                setApiKeyError('')
+              }}
               placeholder={hasSavedApiKey ? '已保存（留空则不修改）' : '输入 API Key'}
             />
             <button
               type="button"
               className="btn btn-secondary shrink-0"
-              onClick={() => setShowApiKey((v) => !v)}
+              disabled={revealingApiKey}
+              onClick={() => void toggleApiKeyVisibility()}
             >
-              {showApiKey ? '隐藏' : '显示'}
+              {revealingApiKey ? '读取中...' : showApiKey ? '隐藏' : '显示'}
             </button>
             <button
               type="button"
@@ -269,6 +328,7 @@ export function Settings(): React.JSX.Element {
               {testing ? '测试中...' : '测试连接'}
             </button>
           </div>
+          {apiKeyError && <p className="text-error-msg">{apiKeyError}</p>}
         </label>
 
         <label>
@@ -280,6 +340,16 @@ export function Settings(): React.JSX.Element {
               setConfig({ ...config, baseUrl: e.target.value, providerId: 'custom' })
             }
             placeholder="https://api.example.com/anthropic"
+          />
+        </label>
+
+        <label>
+          <span className="field-label">模型列表地址（可选）</span>
+          <input
+            className="field-input"
+            value={config.modelsUrl}
+            onChange={(e) => setConfig({ ...config, modelsUrl: e.target.value })}
+            placeholder="留空则用 Base URL/v1/models"
           />
         </label>
 

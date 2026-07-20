@@ -18,6 +18,7 @@ interface PersistedProfile {
   name: string
   providerId: ProviderId
   baseUrl: string
+  modelsUrl?: string
   encryptedApiKey?: string
   models: AppConfig['models']
   availableModels?: AppConfig['availableModels']
@@ -212,6 +213,7 @@ function profileToView(profile: PersistedProfile): ProfileView {
     name: profile.name,
     providerId: profile.providerId,
     baseUrl: profile.baseUrl,
+    modelsUrl: profile.modelsUrl ?? '',
     models: profile.models,
     availableModels: profile.availableModels ?? [],
     modelsFetchedAt: profile.modelsFetchedAt,
@@ -234,6 +236,7 @@ function buildAppConfig(
     providerId: active.providerId,
     apiKey: decryptApiKey(active.encryptedApiKey),
     baseUrl: active.baseUrl,
+    modelsUrl: active.modelsUrl ?? '',
     models: active.models,
     availableModels: active.availableModels ?? [],
     modelsFetchedAt: active.modelsFetchedAt,
@@ -254,6 +257,17 @@ function buildAppConfig(
 export function getConfig(): AppConfig {
   const { data, profiles, activeProfileId } = loadPersistedState()
   return buildAppConfig(profiles, activeProfileId, data)
+}
+
+export function getProfileApiKey(profileId: string): string {
+  const { profiles } = loadPersistedState()
+  const profile = profiles.find((item) => item.id === profileId)
+
+  if (!profile) {
+    throw new Error('配置档案不存在')
+  }
+
+  return decryptApiKey(profile.encryptedApiKey)
 }
 
 export function getActiveProfileName(): string {
@@ -308,6 +322,7 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   const hasProfileUpdate =
     partial.providerId !== undefined ||
     partial.baseUrl !== undefined ||
+    partial.modelsUrl !== undefined ||
     partial.apiKey !== undefined ||
     partial.models !== undefined ||
     partial.availableModels !== undefined ||
@@ -321,6 +336,7 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
         name: getActiveProfileName(),
         providerId: partial.providerId ?? current.providerId,
         baseUrl: partial.baseUrl ?? current.baseUrl,
+        modelsUrl: partial.modelsUrl ?? current.modelsUrl,
         apiKey: partial.apiKey,
         models: partial.models ?? current.models,
         availableModels: partial.availableModels ?? current.availableModels,
@@ -353,6 +369,7 @@ export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings
   const now = Date.now()
   const normalizedBaseUrl = normalizeProviderBaseUrl(input.baseUrl)
   const providerId = migrateProviderId(normalizedBaseUrl, input.providerId)
+  const modelsUrl = (input.modelsUrl ?? '').trim().replace(/\/+$/, '')
 
   let nextProfiles: PersistedProfile[]
   let nextActiveId = activeProfileId
@@ -366,6 +383,7 @@ export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings
         name: input.name.trim() || profile.name,
         providerId,
         baseUrl: normalizedBaseUrl,
+        modelsUrl,
         encryptedApiKey: input.apiKey?.trim()
           ? encryptApiKey(input.apiKey.trim())
           : profile.encryptedApiKey,
@@ -382,6 +400,7 @@ export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings
       name: input.name.trim() || `配置 ${profiles.length + 1}`,
       providerId,
       baseUrl: normalizedBaseUrl,
+      modelsUrl,
       encryptedApiKey: input.apiKey?.trim() ? encryptApiKey(input.apiKey.trim()) : undefined,
       models: input.models,
       availableModels: input.availableModels ?? [],
@@ -505,7 +524,8 @@ export function updateActiveProfileModels(
   apiKey: string,
   availableModels: AppConfig['availableModels'],
   models: AppConfig['models'],
-  modelsFetchedAt: number
+  modelsFetchedAt: number,
+  modelsUrl?: string
 ): AppConfig {
   const current = getConfig()
 
@@ -514,6 +534,7 @@ export function updateActiveProfileModels(
     name: getActiveProfileName(),
     providerId: current.providerId,
     baseUrl,
+    modelsUrl: modelsUrl ?? current.modelsUrl,
     apiKey,
     models,
     availableModels,
