@@ -1,6 +1,14 @@
-import type { AvailableModel, ConnectionTestResult, ModelConfig } from '../shared/types'
+import type {
+  AvailableModel,
+  BenchmarkResult,
+  ConnectionTestResult,
+  ModelConfig
+} from '../shared/types'
 
 const FETCH_TIMEOUT_MS = 3000
+const BENCHMARK_TIMEOUT_MS = 60000
+const BENCHMARK_MAX_TOKENS = 128
+const BENCHMARK_PROMPT = '请从1数到60，每行只写一个数字，不要有其他文字。'
 
 interface ModelsApiResponse {
   data?: Array<{
@@ -127,6 +135,151 @@ export async function testConnection(
       message: error instanceof Error ? error.message : String(error),
       models: []
     }
+  }
+}
+
+function formatBenchmarkMessage(tokensPerSecond: number, ttftSeconds: number): string {
+  return `${tokensPerSecond.toFixed(1)} t/s | 首字 ${ttftSeconds.toFixed(1)}s`
+}
+
+interface StreamMetrics {
+  firstTokenAt: number | null
+  outputTokens: number
+  textLength: number
+}
+
+interface StreamEvent {
+  type?: string
+  delta?: { text?: unknown }
+  usage?: { output_tokens?: unknown }
+  error?: { message?: string }
+}
+
+/** 解析单条 SSE data 载荷并累计指标，流结束时返回 true */
+function handleSseLine(payload: string, metrics: StreamMetrics): boolean {
+  if (!payload || payload === '[DONE]') return false
+
+  let event: StreamEvent
+  try {
+    event = JSON.parse(payload) as StreamEvent
+  } catch {
+    return false
+  }
+
+  if (event.type === 'content_block_delta') {
+    const text = event.delta?.text
+    if (typeof text === 'string' && text.length > 0) {
+      if (metrics.firstTokenAt === null) metrics.firstTokenAt = performance.now()
+      metrics.textLength += text.length
+    }
+  } else if (event.type === 'message_delta') {
+    const tokens = event.usage?.output_tokens
+    if (typeof tokens === 'number' && tokens > 0) metrics.outputTokens = tokens
+  } else if (event.type === 'error') {
+    throw new Error(event.error?.message ?? 'API 返回错误')
+  } else if (event.type === 'message_stop') {
+    return true
+  }
+
+  return false
+}
+
+/** 发起一次流式对话，测量首字延迟（TTFT）与生成吞吐（t/s） */
+export async function benchmarkModel(
+  baseUrl: string,
+  apiKey: string,
+  model: string
+): Promise<BenchmarkResult> {
+  if (!baseUrl.trim()) {
+    throw new Error('请先填写 API Base URL')
+  }
+  if (!apiKey.trim()) {
+    throw new Error('请先填写 API Key')
+  }
+  if (!model.trim()) {
+    throw new Error('请先选择主模型')
+  }
+
+  const url = `${normalizeBaseUrl(baseUrl)}/v1/messages`
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), BENCHMARK_TIMEOUT_MS)
+
+  const startedAt = performance.now()
+  const metrics: StreamMetrics = { firstTokenAt: null, outputTokens: 0, textLength: 0 }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...buildAuthHeaders(apiKey),
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model.trim(),
+        max_tokens: BENCHMARK_MAX_TOKENS,
+        stream: true,
+        messages: [{ role: 'user', content: BENCHMARK_PROMPT }]
+      }),
+      signal: controller.signal
+    })
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '')
+      throw new Error(mapError(response.status, body))
+    }
+    if (!response.body) {
+      throw new Error('该地址不支持流式响应，无法测速')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let stopped = false
+
+    while (!stopped) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      buffer += decoder.decode(chunk.value, { stream: true })
+
+      let newlineIndex = buffer.indexOf('\n')
+      while (newlineIndex !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim()
+        buffer = buffer.slice(newlineIndex + 1)
+        if (line.startsWith('data:')) {
+          stopped = handleSseLine(line.slice(5).trim(), metrics)
+        }
+        newlineIndex = buffer.indexOf('\n')
+      }
+    }
+
+    const finishedAt = performance.now()
+    if (metrics.firstTokenAt === null) {
+      throw new Error('未收到任何输出，无法测速')
+    }
+
+    const ttftSeconds = (metrics.firstTokenAt - startedAt) / 1000
+    const generationSeconds = Math.max((finishedAt - metrics.firstTokenAt) / 1000, 0.001)
+    const outputTokens =
+      metrics.outputTokens > 0 ? metrics.outputTokens : Math.max(Math.round(metrics.textLength / 3), 1)
+    const tokensPerSecond = outputTokens / generationSeconds
+
+    return {
+      ok: true,
+      message: formatBenchmarkMessage(tokensPerSecond, ttftSeconds),
+      tokensPerSecond,
+      ttftSeconds,
+      outputTokens
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { ok: false, message: '测速超时，请检查网络或模型是否可用' }
+    }
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error)
+    }
+  } finally {
+    clearTimeout(timer)
   }
 }
 

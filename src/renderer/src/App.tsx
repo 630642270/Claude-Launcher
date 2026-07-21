@@ -1,134 +1,189 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { ConfigView } from '@shared/types'
-import { Home } from './pages/Home'
-import { Settings } from './pages/Settings'
-import { HistoryPage } from './pages/History'
-import { TerminalView } from './components/TerminalView'
+import { useCallback, useEffect, useState } from "react";
+import type { ConfigView } from "@shared/types";
+import { Home } from "./pages/Home";
+import { Settings } from "./pages/Settings";
+import { HistoryPage } from "./pages/History";
+import { TerminalView } from "./components/TerminalView";
+import { TitleBar } from "./components/TitleBar";
+import { ConfirmDialog } from "./components/ui/ConfirmDialog";
 
-type Page = 'home' | 'settings' | 'history'
+type Route = "main" | "settings" | "history";
 
-function App(): React.JSX.Element {
-  const [page, setPage] = useState<Page>('home')
-  const [config, setConfig] = useState<ConfigView | null>(null)
-  const [showTerminal, setShowTerminal] = useState(false)
-  const [sessionActive, setSessionActive] = useState(false)
-  const [focusTerminal, setFocusTerminal] = useState(false)
+function getRoute(): Route {
+  const hash = window.location.hash;
+  if (hash.startsWith("#/settings")) return "settings";
+  if (hash.startsWith("#/history")) return "history";
+  return "main";
+}
 
-  const refreshConfig = async (): Promise<void> => {
-    const data = await window.launcher.getConfig()
-    setConfig(data)
-  }
+function SettingsWindow(): React.JSX.Element {
+  const [dirty, setDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
-  useEffect(() => {
-    refreshConfig()
-    window.launcher.getTerminalSession().then((state) => setSessionActive(state.active))
-  }, [])
-
-  useEffect(() => {
-    if (page === 'home' || page === 'settings') {
-      refreshConfig()
+  const handleClose = useCallback((): void => {
+    if (dirty) {
+      setConfirmDiscard(true);
+    } else {
+      void window.launcher.closeWindow();
     }
-  }, [page])
-
-  useEffect(() => {
-    const unsubscribeLaunched = window.launcher.onTerminalLaunched((result) => {
-      if (result.mode === 'embedded') {
-        setShowTerminal(true)
-        setPage('home')
-        setFocusTerminal(true)
-      } else {
-        setShowTerminal(false)
-      }
-    })
-
-    const unsubscribeSession = window.launcher.onTerminalSession((state) => {
-      setSessionActive(state.active)
-    })
-
-    return () => {
-      unsubscribeLaunched()
-      unsubscribeSession()
-    }
-  }, [])
-
-  const handleTerminalClose = useCallback(async (): Promise<void> => {
-    await window.launcher.killTerminal()
-    setShowTerminal(false)
-  }, [])
-
-  const handleTerminalRelaunch = useCallback(async (): Promise<void> => {
-    const freshConfig = await window.launcher.getConfig()
-    if (!freshConfig.lastProjectPath) return
-
-    const terminalSize = await window.launcher.getTerminalSize()
-    await window.launcher.launch({
-      projectPath: freshConfig.lastProjectPath,
-      mode: 'embedded',
-      terminalSize
-    })
-  }, [])
-
-  const handleKillSession = useCallback(async (): Promise<void> => {
-    await window.launcher.killTerminal()
-    setShowTerminal(false)
-  }, [])
+  }, [dirty]);
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <h1 className="app-title">Claude Launcher</h1>
-            <p className="app-subtitle">Claude Code 兼容 API 隔离环境启动器</p>
-          </div>
-          <nav className="app-nav">
+    <div className="app-shell app-shell-window">
+      <TitleBar title="设置" onClose={handleClose} />
+      <div className="window-body">
+        <Settings onDirtyChange={setDirty} />
+      </div>
+      <ConfirmDialog
+        open={confirmDiscard}
+        danger
+        title="放弃未保存的更改？"
+        message="当前窗口还有未保存的设置修改，直接关闭将放弃这些更改。"
+        confirmLabel="放弃并关闭"
+        onConfirm={() => void window.launcher.closeWindow()}
+        onCancel={() => setConfirmDiscard(false)}
+      />
+    </div>
+  );
+}
+
+function HistoryWindow(): React.JSX.Element {
+  return (
+    <div className="app-shell app-shell-window">
+      <TitleBar title="启动历史" />
+      <div className="window-body">
+        <HistoryPage />
+      </div>
+    </div>
+  );
+}
+
+function MainWindow(): React.JSX.Element {
+  const [config, setConfig] = useState<ConfigView | null>(null);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [focusTerminal, setFocusTerminal] = useState(false);
+
+  const refreshConfig = useCallback(async (): Promise<void> => {
+    const data = await window.launcher.getConfig();
+    setConfig(data);
+  }, []);
+
+  useEffect(() => {
+    void refreshConfig();
+    window.launcher
+      .getTerminalSession()
+      .then((state) => setSessionActive(state.active));
+  }, [refreshConfig]);
+
+  useEffect(() => {
+    const unsubscribeConfig = window.launcher.onConfigChanged(() => {
+      void refreshConfig();
+    });
+
+    const unsubscribeLaunched = window.launcher.onTerminalLaunched((result) => {
+      if (result.mode === "embedded") {
+        setShowTerminal(true);
+        setFocusTerminal(true);
+      }
+    });
+
+    const unsubscribeSession = window.launcher.onTerminalSession((state) => {
+      setSessionActive(state.active);
+    });
+
+    return () => {
+      unsubscribeConfig();
+      unsubscribeLaunched();
+      unsubscribeSession();
+    };
+  }, [refreshConfig]);
+
+  const handleTerminalClose = useCallback(async (): Promise<void> => {
+    await window.launcher.killTerminal();
+    setShowTerminal(false);
+  }, []);
+
+  const handleTerminalRelaunch = useCallback(async (): Promise<void> => {
+    const freshConfig = await window.launcher.getConfig();
+    if (!freshConfig.lastProjectPath) return;
+
+    const terminalSize = await window.launcher.getTerminalSize();
+    await window.launcher.launch({
+      projectPath: freshConfig.lastProjectPath,
+      mode: "embedded",
+      terminalSize,
+    });
+  }, []);
+
+  const handleKillSession = useCallback(async (): Promise<void> => {
+    await window.launcher.killTerminal();
+    setShowTerminal(false);
+  }, []);
+
+  return (
+    <div className="app-shell app-shell-main">
+      <TitleBar title="Claude Launcher" />
+
+      <div className="app-toolbar">
+        <nav className="toolbar-nav">
+          <button
+            type="button"
+            className={`nav-link ${showTerminal ? "" : "nav-link-active"}`}
+            aria-current={showTerminal ? undefined : "page"}
+            onClick={() => setShowTerminal(false)}
+          >
+            启动
+          </button>
+          <button
+            type="button"
+            className="nav-link"
+            onClick={() => void window.launcher.openSettingsWindow()}
+          >
+            设置
+            <span className="nav-ext" aria-hidden="true">
+              ↗
+            </span>
+          </button>
+          <button
+            type="button"
+            className="nav-link"
+            onClick={() => void window.launcher.openHistoryWindow()}
+          >
+            历史
+            <span className="nav-ext" aria-hidden="true">
+              ↗
+            </span>
+          </button>
+        </nav>
+        {sessionActive && (
+          <span className="session-indicator">
+            <span className="session-dot" aria-hidden="true" />
+            内嵌会话运行中
             <button
               type="button"
-              className={`nav-link ${page === 'home' ? 'nav-link-active' : ''}`}
-              onClick={() => setPage('home')}
+              className="session-kill-btn"
+              onClick={() => void handleKillSession()}
             >
-              启动
+              终止
             </button>
-            <button
-              type="button"
-              className={`nav-link ${page === 'settings' ? 'nav-link-active' : ''}`}
-              onClick={() => setPage('settings')}
-            >
-              设置
-            </button>
-            <button
-              type="button"
-              className={`nav-link ${page === 'history' ? 'nav-link-active' : ''}`}
-              onClick={() => setPage('history')}
-            >
-              历史
-            </button>
-            {sessionActive && (
-              <span className="session-indicator">
-                内嵌会话运行中
-                <button type="button" className="session-kill-btn" onClick={() => void handleKillSession()}>
-                  终止
-                </button>
-              </span>
-            )}
-          </nav>
-        </div>
-      </header>
+          </span>
+        )}
+      </div>
 
       <main className="app-main">
-        {page === 'home' && (
+        <div className={`home-slot ${showTerminal ? "home-slot-hidden" : ""}`}>
           <Home
             config={config}
-            onNavigate={setPage}
             onConfigChange={setConfig}
             onTerminalShow={setShowTerminal}
           />
-        )}
-        {page === 'settings' && <Settings />}
-        {page === 'history' && <HistoryPage />}
+        </div>
 
-        <div className={`terminal-panel ${showTerminal ? 'terminal-panel-visible' : 'terminal-panel-hidden'}`}>
-          <section className="card min-h-terminal-card">
+        <div
+          className={`terminal-panel ${showTerminal ? "terminal-panel-visible" : "terminal-panel-hidden"}`}
+        >
+          <section className="card terminal-card">
             <TerminalView
               active={showTerminal}
               fontSize={config?.terminalFontSize ?? 14}
@@ -142,7 +197,14 @@ function App(): React.JSX.Element {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
-export default App
+function App(): React.JSX.Element {
+  const route = getRoute();
+  if (route === "settings") return <SettingsWindow />;
+  if (route === "history") return <HistoryWindow />;
+  return <MainWindow />;
+}
+
+export default App;

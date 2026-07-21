@@ -7,16 +7,13 @@ import type {
   GlobalSettings,
   LaunchRecord,
   ProfileInput,
-  ProfileView,
-  ProviderId
+  ProfileView
 } from '../shared/types'
 import { DEFAULT_CONFIG } from '../shared/types'
-import { inferProviderId, normalizeProviderBaseUrl } from '../shared/providers'
 
 interface PersistedProfile {
   id: string
   name: string
-  providerId: ProviderId
   baseUrl: string
   modelsUrl?: string
   encryptedApiKey?: string
@@ -32,7 +29,6 @@ interface PersistedConfig {
   activeProfileId?: string
   profiles?: PersistedProfile[]
   encryptedApiKey?: string
-  providerId?: ProviderId
   baseUrl?: string
   models?: AppConfig['models']
   availableModels?: AppConfig['availableModels']
@@ -91,22 +87,17 @@ function maskApiKey(apiKey: string): string {
   return `${apiKey.slice(0, 4)}****${apiKey.slice(-4)}`
 }
 
-function migrateProviderId(baseUrl: string, providerId?: ProviderId): ProviderId {
-  const inferred = inferProviderId(baseUrl)
-  if (inferred !== 'custom') return inferred
-  if (providerId) return providerId
-  return 'custom'
+function normalizeBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, '')
 }
 
 function createDefaultProfile(name = '默认'): PersistedProfile {
   const now = Date.now()
-  const deepseekBaseUrl = DEFAULT_CONFIG.baseUrl
 
   return {
     id: randomUUID(),
     name,
-    providerId: DEFAULT_CONFIG.providerId,
-    baseUrl: deepseekBaseUrl,
+    baseUrl: '',
     models: DEFAULT_CONFIG.models,
     availableModels: [],
     createdAt: now,
@@ -126,22 +117,17 @@ function ensureProfiles(data: PersistedConfig): {
         : data.profiles[0].id
 
     return {
-      profiles: data.profiles.map((profile) => ({
-        ...profile,
-        baseUrl: normalizeProviderBaseUrl(profile.baseUrl),
-        providerId: migrateProviderId(profile.baseUrl, profile.providerId)
-      })),
+      profiles: data.profiles,
       activeProfileId,
       migrated: activeProfileId !== data.activeProfileId
     }
   }
 
   const now = Date.now()
-  const legacyBaseUrl = normalizeProviderBaseUrl(data.baseUrl ?? DEFAULT_CONFIG.baseUrl)
+  const legacyBaseUrl = normalizeBaseUrl(data.baseUrl ?? '')
   const profile: PersistedProfile = {
     id: randomUUID(),
     name: '默认',
-    providerId: migrateProviderId(legacyBaseUrl, data.providerId),
     baseUrl: legacyBaseUrl,
     encryptedApiKey: data.encryptedApiKey,
     models: data.models ?? DEFAULT_CONFIG.models,
@@ -211,7 +197,6 @@ function profileToView(profile: PersistedProfile): ProfileView {
   return {
     id: profile.id,
     name: profile.name,
-    providerId: profile.providerId,
     baseUrl: profile.baseUrl,
     modelsUrl: profile.modelsUrl ?? '',
     models: profile.models,
@@ -233,7 +218,6 @@ function buildAppConfig(
 
   return {
     activeProfileId: active.id,
-    providerId: active.providerId,
     apiKey: decryptApiKey(active.encryptedApiKey),
     baseUrl: active.baseUrl,
     modelsUrl: active.modelsUrl ?? '',
@@ -320,7 +304,6 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.terminalScrollback !== undefined) global.terminalScrollback = partial.terminalScrollback
 
   const hasProfileUpdate =
-    partial.providerId !== undefined ||
     partial.baseUrl !== undefined ||
     partial.modelsUrl !== undefined ||
     partial.apiKey !== undefined ||
@@ -334,7 +317,6 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
       {
         id: current.activeProfileId,
         name: getActiveProfileName(),
-        providerId: partial.providerId ?? current.providerId,
         baseUrl: partial.baseUrl ?? current.baseUrl,
         modelsUrl: partial.modelsUrl ?? current.modelsUrl,
         apiKey: partial.apiKey,
@@ -367,8 +349,7 @@ export function switchProfile(profileId: string): AppConfig {
 export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings>): AppConfig {
   const { data, profiles, activeProfileId } = loadPersistedState()
   const now = Date.now()
-  const normalizedBaseUrl = normalizeProviderBaseUrl(input.baseUrl)
-  const providerId = migrateProviderId(normalizedBaseUrl, input.providerId)
+  const normalizedBaseUrl = normalizeBaseUrl(input.baseUrl)
   const modelsUrl = (input.modelsUrl ?? '').trim().replace(/\/+$/, '')
 
   let nextProfiles: PersistedProfile[]
@@ -381,7 +362,6 @@ export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings
       return {
         ...profile,
         name: input.name.trim() || profile.name,
-        providerId,
         baseUrl: normalizedBaseUrl,
         modelsUrl,
         encryptedApiKey: input.apiKey?.trim()
@@ -398,7 +378,6 @@ export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings
     const profile: PersistedProfile = {
       id: randomUUID(),
       name: input.name.trim() || `配置 ${profiles.length + 1}`,
-      providerId,
       baseUrl: normalizedBaseUrl,
       modelsUrl,
       encryptedApiKey: input.apiKey?.trim() ? encryptApiKey(input.apiKey.trim()) : undefined,
@@ -440,6 +419,34 @@ export function saveProfile(input: ProfileInput, global?: Partial<GlobalSettings
       history: data.history ?? []
     })
   }
+
+  return getConfig()
+}
+
+export function duplicateProfile(profileId: string): AppConfig {
+  const { data, profiles } = loadPersistedState()
+
+  const source = profiles.find((p) => p.id === profileId)
+  if (!source) {
+    throw new Error('配置档案不存在')
+  }
+
+  const now = Date.now()
+  const copy: PersistedProfile = {
+    ...source,
+    id: randomUUID(),
+    name: `${source.name} (副本)`,
+    createdAt: now,
+    updatedAt: now
+  }
+
+  const nextProfiles = [...profiles, copy]
+
+  store.set({
+    profiles: nextProfiles,
+    activeProfileId: copy.id,
+    history: data.history ?? []
+  })
 
   return getConfig()
 }
@@ -532,7 +539,6 @@ export function updateActiveProfileModels(
   return saveProfile({
     id: current.activeProfileId,
     name: getActiveProfileName(),
-    providerId: current.providerId,
     baseUrl,
     modelsUrl: modelsUrl ?? current.modelsUrl,
     apiKey,

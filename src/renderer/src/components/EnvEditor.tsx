@@ -22,17 +22,15 @@ export function EnvEditor({ value, onChange }: EnvEditorProps): React.JSX.Elemen
 
   return (
     <div className="stack">
-      <div className="env-header">
-        <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#d1d5db' }}>
-          自定义环境变量
-        </h3>
-        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.875rem' }} onClick={addPair}>
+      <div className="section-header">
+        <h3 className="env-title">自定义环境变量</h3>
+        <button type="button" className="btn btn-secondary" onClick={addPair}>
           添加
         </button>
       </div>
 
       {value.length === 0 ? (
-        <p className="text-muted">暂无自定义变量，将使用上方模型与环境配置。</p>
+        <p className="hint-text">暂无自定义变量，将使用上方模型与环境配置。</p>
       ) : (
         <div className="env-list">
           {value.map((pair, index) => (

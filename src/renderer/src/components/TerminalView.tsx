@@ -20,6 +20,8 @@ interface ContextMenuState {
   y: number
 }
 
+const TOAST_DURATION_MS = 2200
+
 export function TerminalView({
   active,
   fontSize,
@@ -40,10 +42,11 @@ export function TerminalView({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [matchInfo, setMatchInfo] = useState<{ index: number; count: number } | null>(null)
 
   const showToast = useCallback((message: string) => {
     setToast(message)
-    window.setTimeout(() => setToast(''), 1500)
+    window.setTimeout(() => setToast(''), TOAST_DURATION_MS)
   }, [])
 
   const copySelection = useCallback(async () => {
@@ -172,6 +175,14 @@ export function TerminalView({
       terminal.writeln('\r\n\x1b[33m[Claude Code 已退出]\x1b[0m')
     })
 
+    const resultsDisposable = searchAddon.onDidChangeResults((results) => {
+      if (!results) {
+        setMatchInfo(null)
+        return
+      }
+      setMatchInfo({ index: results.resultIndex, count: results.resultCount })
+    })
+
     const handleContextMenu = (event: MouseEvent): void => {
       event.preventDefault()
       setContextMenu({ x: event.clientX, y: event.clientY })
@@ -198,6 +209,7 @@ export function TerminalView({
     return () => {
       unsubscribeData()
       unsubscribeExit()
+      resultsDisposable.dispose()
       window.clearTimeout(resizeTimer)
       resizeObserver.disconnect()
       containerRef.current?.removeEventListener('contextmenu', handleContextMenu)
@@ -264,9 +276,12 @@ export function TerminalView({
   return (
     <div ref={shellRef} className="terminal-shell">
       <div className="terminal-header">
-        <span>
+        <span className="terminal-title">
+          <span className="terminal-status-dot" aria-hidden="true" />
           内嵌终端
-          {exited && <span className="terminal-status-exited"> · 已退出</span>}
+          {exited && (
+            <span className="terminal-exited-badge">已退出</span>
+          )}
         </span>
         <div className="terminal-toolbar">
           {exited && (
@@ -305,9 +320,26 @@ export function TerminalView({
             className="field-input terminal-search-input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearchOpen(false)
+                setSearchQuery('')
+                terminalRef.current?.focus()
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                searchAddonRef.current?.findNext(searchQuery)
+              }
+            }}
             placeholder="搜索终端输出..."
             autoFocus
           />
+          <span className="terminal-search-count" aria-live="polite">
+            {!searchQuery
+              ? ''
+              : matchInfo && matchInfo.count > 0
+                ? `${matchInfo.index + 1} / ${matchInfo.count}`
+                : '无匹配'}
+          </span>
           <button
             type="button"
             className="btn btn-secondary terminal-toolbar-btn"
@@ -340,16 +372,18 @@ export function TerminalView({
       {contextMenu && (
         <div
           className="terminal-context-menu"
+          role="menu"
+          aria-label="终端操作"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
-          <button type="button" onClick={() => { void copySelection(); setContextMenu(null) }}>
+          <button type="button" role="menuitem" onClick={() => { void copySelection(); setContextMenu(null) }}>
             复制
           </button>
-          <button type="button" onClick={() => { void pasteClipboard(); setContextMenu(null) }}>
+          <button type="button" role="menuitem" onClick={() => { void pasteClipboard(); setContextMenu(null) }}>
             粘贴
           </button>
-          <button type="button" onClick={() => { selectAll(); setContextMenu(null) }}>
+          <button type="button" role="menuitem" onClick={() => { void selectAll(); setContextMenu(null) }}>
             全选
           </button>
         </div>

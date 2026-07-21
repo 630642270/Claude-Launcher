@@ -2,11 +2,25 @@ export type TerminalMode = 'embedded' | 'external' | 'ask'
 
 export type ExternalTerminalPreference = 'wt' | 'powershell' | 'cmd'
 
-export type { ProviderId, ProviderPreset, ModelConfig } from './providers'
-export { EMPTY_MODELS, PROVIDER_PRESETS, getProviderPreset, inferProviderId } from './providers'
 export { TERMINAL_MODE_LABELS, formatTerminalMode } from './labels'
-import type { ProviderId, ModelConfig } from './providers'
-import { EMPTY_MODELS, getProviderPreset } from './providers'
+
+export interface ModelConfig {
+  main: string
+  opus: string
+  sonnet: string
+  haiku: string
+  subagent: string
+  effortLevel: string
+}
+
+export const EMPTY_MODELS: ModelConfig = {
+  main: '',
+  opus: '',
+  sonnet: '',
+  haiku: '',
+  subagent: '',
+  effortLevel: 'max'
+}
 
 export interface EnvPair {
   key: string
@@ -24,17 +38,25 @@ export interface ConnectionTestResult {
   models: AvailableModel[]
 }
 
+export interface BenchmarkResult {
+  ok: boolean
+  message: string
+  tokensPerSecond?: number
+  ttftSeconds?: number
+  outputTokens?: number
+}
+
 export interface ProviderRequest {
   baseUrl?: string
   apiKey?: string
   modelsUrl?: string
   profileId?: string
+  model?: string
 }
 
 export interface ApiProfile {
   id: string
   name: string
-  providerId: ProviderId
   baseUrl: string
   /** Optional models list endpoint; empty = {baseUrl}/v1/models */
   modelsUrl: string
@@ -53,7 +75,6 @@ export interface ProfileView extends ApiProfile {
 export interface ProfileInput {
   id?: string
   name: string
-  providerId: ProviderId
   baseUrl: string
   modelsUrl?: string
   apiKey?: string
@@ -64,7 +85,6 @@ export interface ProfileInput {
 
 export interface AppConfig {
   activeProfileId: string
-  providerId: ProviderId
   apiKey: string
   baseUrl: string
   modelsUrl: string
@@ -128,15 +148,12 @@ export type ConfigView = Omit<AppConfig, 'apiKey'> & {
   profiles: ProfileView[]
 }
 
-const deepseekPreset = getProviderPreset('deepseek')
-
 export const DEFAULT_CONFIG: AppConfig = {
   activeProfileId: '',
-  providerId: 'deepseek',
   apiKey: '',
-  baseUrl: deepseekPreset.baseUrl,
+  baseUrl: '',
   modelsUrl: '',
-  models: { ...EMPTY_MODELS, ...deepseekPreset.defaultModels, effortLevel: 'max' },
+  models: { ...EMPTY_MODELS },
   availableModels: [],
   customEnv: [],
   terminalMode: 'embedded',

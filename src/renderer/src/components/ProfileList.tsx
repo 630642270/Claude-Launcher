@@ -1,5 +1,4 @@
 import type { ProfileView } from '@shared/types'
-import { getProviderPreset } from '@shared/providers'
 
 interface ProfileListProps {
   profiles: ProfileView[]
@@ -11,10 +10,9 @@ interface ProfileListProps {
 }
 
 function formatProfileMeta(profile: ProfileView): string {
-  const providerName = getProviderPreset(profile.providerId).name
   const keyLabel = profile.apiKeyMasked || '未配置 Key'
   const modelLabel = profile.models.main || '未设置模型'
-  return `${providerName} · ${keyLabel} · ${modelLabel}`
+  return `${keyLabel} · ${modelLabel}`
 }
 
 export function ProfileList({
